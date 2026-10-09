@@ -1,0 +1,43 @@
+# ════════════════════════════════════════════════════════════════════
+#  GoldBot — configuration. Copie ce fichier en config/config.toml
+#  (config.toml n'est jamais envoyé sur GitHub : il peut contenir tes accès)
+# ════════════════════════════════════════════════════════════════════
+
+# "paper" = ordres simulés sur les vrais prix (aucun argent en jeu)
+# "live"  = ordres réels sur le compte MT5 connecté. COMMENCE PAR UN COMPTE DÉMO HFM.
+mode = "paper"
+
+[mt5]
+# Laisse vide : le bot utilise le terminal MetaTrader 5 déjà ouvert et connecté.
+# Sinon renseigne le chemin du terminal et tes identifiants (compte démo d'abord !).
+terminal_path = ""         # ex. "C:/Program Files/HFM MetaTrader 5/terminal64.exe"
+login = 0
+password = ""
+server = ""                # ex. "HFMarketsGlobal-Demo"
+symbol = ""                # vide = détection automatique (XAUUSD, XAUUSD.r, GOLD…)
+magic = 770077             # identifiant des ordres du bot (ne touche jamais à tes trades manuels)
+deviation_points = 30      # glissement max accepté à l'exécution
+
+[strategy]
+name = "donchian_trend"
+timeframe = "H4"
+entry = 20
+exit = 10
+trend_ema = 200
+sl_atr = 2.0
+regime_filter = true
+
+[risk]
+risk_pct = 0.005           # risque par trade : 0,5 % pour démarrer (1 % max conseillé)
+max_daily_loss = 0.03      # -3 % sur la journée → plus aucune entrée jusqu'au lendemain
+max_drawdown = 0.12        # -12 % depuis le plus haut → le bot ferme tout et S'ARRÊTE (redémarrage manuel)
+max_spread = 0.80          # $/once : pas d'entrée si le spread est plus large (news, ouverture…)
+max_positions = 1
+news_blackout_minutes = 45 # pas d'entrée autour du NFP (1er vendredi) et des dates listées ci-dessous
+news_dates = []            # ex. ["2026-10-29 18:00", "2026-11-13 13:30"]  (UTC : FOMC, CPI…)
+no_entry_friday_after_utc = 18
+
+[notify]
+# Optionnel : messages Telegram (crée un bot avec @BotFather, récupère ton chat_id avec @userinfobot)
+telegram_token = ""
+telegram_chat_id = ""
