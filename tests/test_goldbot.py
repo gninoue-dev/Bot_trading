@@ -237,3 +237,60 @@ def test_mt5_broker_detects_symbol_offset_and_sends_safe_orders():
     assert req["type_filling"] == fake.ORDER_FILLING_IOC
     assert req["magic"] == 770077
     assert req["sl"] <= 4200.4 - 0.55 + 1e-6, "stop éloigné pour respecter le stops level du broker"
+
+
+# ── petits comptes (dès 10 $ sur compte cent) ─────────────
+
+def test_small_account_min_lot_cap():
+    # 10 $ en compte cent = 1 000 USC ; stop de 38 $ → 0,01 lot perd 38 USC = 3,8 %
+    assert position_size(1_000, 0.01, 38, SPEC, max_risk_min_lot=0.05) == pytest.approx(0.01)
+    assert position_size(1_000, 0.01, 76, SPEC, max_risk_min_lot=0.05) == 0.0, "7,6 % > plafond 5 % : refusé"
+    # compte standard de 10 $ : jamais de trade
+    assert position_size(10, 0.01, 38, SPEC, max_risk_min_lot=0.08) == 0.0
+
+
+def test_money_display_cent_account():
+    from goldbot.risk import money
+    assert money(1000, "USC") == "1 000 USC (10.00 $)"
+
+
+def _small_engine(currency: str, capital: float, leverage: float = 500, tf_cap: float = 0.05):
+    import logging
+    from goldbot.broker.paper import PaperBroker
+    from goldbot.live import Engine
+    logging.getLogger("goldbot").setLevel(logging.WARNING)
+    df = synthetic(1500, freq="1h")
+    cfg = Config(strategy={"name": "donchian_trend", "timeframe": "H1", "regime_filter": False},
+                 risk=RiskConfig(risk_pct=0.01, max_risk_pct_min_lot=tf_cap, max_spread=5, news_blackout_minutes=0,
+                                 no_entry_friday_after_utc=99, max_daily_loss=0.2, max_drawdown=0.6))
+    br = PaperBroker(df, capital, spread=0.45, leverage=leverage, currency=currency)
+    br.cursor = 400
+    return Engine(cfg, br, Path(tempfile.mkdtemp())), br
+
+
+def test_diagnose_cent_vs_standard():
+    eng, _ = _small_engine("USC", 1000)
+    ok, report = eng.diagnose()
+    assert ok and ("PETIT COMPTE" in report or "adapté" in report)
+    eng, _ = _small_engine("USD", 10)
+    ok, report = eng.diagnose()
+    assert not ok and "COMPTE CENT" in report
+
+
+def test_small_cent_account_trades_with_min_lot_only():
+    eng, br = _small_engine("USC", 1000)
+    while True:
+        eng.tick()
+        if not br.step():
+            break
+    assert br.history, "le petit compte cent doit pouvoir trader"
+    assert {h["volume"] for h in br.history} == {0.01}
+
+
+def test_margin_check_blocks_when_leverage_too_low():
+    eng, br = _small_engine("USC", 1000, leverage=1)   # 0,01 lot d'or ≈ 2 000 USC de marge à 1:1
+    while True:
+        eng.tick()
+        if not br.step():
+            break
+    assert not br.history, "marge insuffisante : aucun trade"

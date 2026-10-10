@@ -4,7 +4,9 @@
   goldbot walkforward [--tf H4]                              → validation hors échantillon + Monte Carlo
   goldbot fetch --source mt5 --tf H4                         → télécharge l'historique de TON broker
   goldbot run                                                → lance le bot (mode du config.toml)
+  goldbot check                                              → diagnostic du compte (capital suffisant ? compte cent ?)
   goldbot status | reset                                     → état des garde-fous / redémarrage après arrêt
+  Petit compte (compte cent) : goldbot --config config/petit_compte.example.toml backtest --tf H1 --capital 1000
 """
 
 from __future__ import annotations
@@ -45,7 +47,8 @@ def cmd_backtest(args) -> None:
     st = _strategy(cfg)
     costs = Costs(spread=args.spread)
     res = run(df, st, args.capital, costs, RiskRules(risk_pct=args.risk, max_daily_loss=cfg.risk.max_daily_loss,
-                                                     max_drawdown=cfg.risk.max_drawdown))
+                                                     max_drawdown=cfg.risk.max_drawdown,
+                                                     max_risk_min_lot=cfg.risk.max_risk_pct_min_lot))
     s = summary(res)
     print(json.dumps(s, ensure_ascii=False, indent=2))
     out = write_report(res, ROOT / "reports" / f"backtest_{args.tf}.html", f"GoldBot — backtest {args.tf}")
@@ -107,6 +110,19 @@ def cmd_run(args) -> None:
     Engine(cfg, broker).run_forever(args.poll)
 
 
+def cmd_check(args) -> None:
+    """Diagnostic du compte : le bot peut-il trader avec ce capital, ce compte, ce stop ?"""
+    from .broker.mt5 import MT5Broker
+    from .live import Engine
+    cfg = load(args.config)
+    broker = MT5Broker(cfg.mt5)
+    broker.connect()
+    ok, report = Engine(cfg, broker).diagnose()
+    broker.shutdown()
+    print(report)
+    sys.exit(0 if ok else 1)
+
+
 def cmd_status(args) -> None:
     from .risk import RiskState
     st = RiskState.load(ROOT / "state" / "risk.json")
@@ -148,6 +164,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--poll", type=int, default=20)
     p.add_argument("--yes", action="store_true", help="pas de confirmation en mode réel (service Windows)")
     p.set_defaults(fn=cmd_run)
+    sub.add_parser("check", help="diagnostic : ce compte peut-il trader ?").set_defaults(fn=cmd_check)
     sub.add_parser("status").set_defaults(fn=cmd_status)
     sub.add_parser("reset").set_defaults(fn=cmd_reset)
 

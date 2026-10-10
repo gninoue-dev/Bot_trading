@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/actif-XAUUSD-d4a017"/>
   <img src="https://img.shields.io/badge/plateforme-MetaTrader%205-1f6feb"/>
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white"/>
-  <img src="https://img.shields.io/badge/tests-14%20%E2%9C%93-2EA043"/>
+  <img src="https://img.shields.io/badge/tests-19%20%E2%9C%93-2EA043"/>
   <img src="https://img.shields.io/badge/priorit%C3%A9-prot%C3%A9ger%20le%20capital-9b2226"/>
 </p>
 
@@ -48,6 +48,14 @@ Le bot participe à la hausse de l'or, puis traverse sa grosse correction en ne 
 | Tes trades manuels | jamais touchés (identifiant « magic » propre au bot) |
 | Panne | stops toujours chez le broker ; reconnexion automatique ; état sauvegardé sur disque |
 
+## 💵 Dès 10 $ : le profil petit compte
+Sur un **compte cent HFM**, avec `config/petit_compte.example.toml` (stratégie H1, risque plafonné à 5 % au lot minimum) :
+- simulation hors échantillon : **10 $ → 17,64 $ en 17 mois**, pire recul -23 % ;
+- `goldbot check` te dit tout de suite si ton compte peut trader ;
+- le bot vérifie la marge avant chaque ordre et refuse tout trade qui dépasse ton plafond.
+
+Détails : [guide](docs/GUIDE_DEMARRAGE.md#quel-capital--oui-dès-10-) et [recherche](docs/STRATEGIE.md#7-version-h1-pour-les-petits-comptes).
+
 ## 🚀 Démarrer
 👉 **[Guide pas à pas](docs/GUIDE_DEMARRAGE.md)** : installation, test sur tes prix HFM, papier, démo, puis réel en petit.
 
@@ -65,6 +73,7 @@ scripts\install_windows.ps1                               # installation
 | `goldbot walkforward [--tf H4] [--csv …]` | validation hors échantillon + Monte Carlo |
 | `goldbot fetch --source mt5 --tf H4` | télécharge l'historique depuis MT5 |
 | `goldbot run` | lance le bot (mode `paper` ou `live` selon la config) |
+| `goldbot check` | diagnostic du compte : capital suffisant ? compte cent nécessaire ? |
 | `goldbot status` / `goldbot reset` | état des garde-fous / redémarrage après un arrêt |
 
 ## 🏗️ Architecture
@@ -85,12 +94,13 @@ goldbot/
 ```bash
 .venv/bin/python -m pytest -q
 ```
-14 tests, qui vérifient notamment que :
+19 tests, qui vérifient notamment que :
 - les stratégies **ne regardent jamais le futur** ;
 - le stop est prioritaire et les gaps sont exécutés au mauvais prix ;
 - la taille de position et les swaps (mercredi ×3, rien le week-end) sont justes ;
 - les garde-fous fonctionnent et que l'arrêt d'urgence survit à un redémarrage ;
 - le moteur réel rejoué donne les mêmes trades que le backtest ;
+- les petits comptes (cent, dès 10 $) tradent au lot minimum, sous le plafond de risque, et uniquement si la marge le permet ;
 - la connexion MT5 se comporte correctement face à un **faux MetaTrader** (symbole `XAUUSD.r`, fuseau GMT+3, requote, stops level).
 
 ---

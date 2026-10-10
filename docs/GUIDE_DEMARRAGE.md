@@ -37,15 +37,28 @@ Ne passe au réel qu'après ces quatre étapes. Commence petit :
 
 Après 3 mois conformes au backtest, tu peux monter à `0.01`. **Jamais plus de 2 %.**
 
-### Quel capital ?
-Sur l'or en H4, le stop fait souvent 60 à 110 $. Même au lot minimum (0,01 = 1 once), un trade risque donc 60 à 110 $.
+### Quel capital ? (oui, dès 10 $)
+Sur l'or, le plus petit ordre possible est **0,01 lot**. Ce qu'il coûte si le stop est touché dépend du type de compte :
 
-| Compte | Capital minimum pour 0,5 % | 1 % | 2 % |
-|---|---|---|---|
-| Standard / Premium (1 lot = 100 onces) | ~15 000 $ | ~7 500 $ | ~3 800 $ |
-| Cent (solde en cents) | ~150 $ | ~76 $ | ~38 $ |
+| | Compte standard / Premium | **Compte cent HFM** |
+|---|---|---|
+| Perte au stop, 0,01 lot en H4 (~76 $ de stop) | ~76 $ | ~0,76 $ |
+| Perte au stop, 0,01 lot en H1 (~38 $ de stop) | ~38 $ | ~0,38 $ |
+| Capital mini, profil normal (H4, 1 %) | ~7 500 $ | ~76 $ |
+| **Capital mini, profil petit compte (H1, ≤ 5 %)** | ~760 $ | **~8 à 10 $** |
 
-Si ton capital est plus petit que la ligne « standard », utilise un **compte cent** (à vérifier chez HFM pour l'or sur MT5). Sinon, le bot refuse d'entrer : il ne prendra jamais un risque trop gros pour toi.
+**Avec 10 $ : compte CENT obligatoire + profil petit compte.**
+1. Ouvre un **compte cent** chez HFM. Le dépôt minimum est de 0 à 5 $. Vérifie qu'il est disponible en MT5 dans ton pays, avec l'or.
+2. Copie `config\petit_compte.example.toml` en `config\config.toml`.
+3. Lance `goldbot check`. Le bot te dit s'il peut trader avec ce compte, et sinon pourquoi.
+
+En profil petit compte, chaque trade risque **3 à 5 % du capital** au lot minimum, au lieu de 1 %. Les mouvements sont donc plus violents :
+- simulation hors échantillon sur 17 mois : **10 $ → 17,64 $, avec un pire recul de -23 %** ;
+- à ce niveau de risque, un recul de -30 à -50 % reste possible lors d'une mauvaise série.
+
+Le risque redescend tout seul vers 1 % quand le compte grandit, car le bot calcule la taille de chaque ordre.
+
+Sur un compte **standard** avec 10 $, le bot refuse de trader : un seul stop ferait perdre plus que tout le compte.
 
 ## Faire tourner le bot 24 h/24
 Le bot doit tourner quand le marché est ouvert, du lundi au vendredi. Deux options :

@@ -37,6 +37,16 @@ class DryRunBroker(Broker):
     def bid_ask(self):
         return self.real.bid_ask()
 
+    def currency(self) -> str:
+        return self.real.currency()
+
+    def margin_required(self, direction, volume, price) -> float:
+        return self.real.margin_required(direction, volume, price)
+
+    def free_margin(self) -> float:
+        used = sum(self.real.margin_required(p.direction, p.volume, p.price_open) for p in self._pos)
+        return self.equity() - used
+
     def bars(self, timeframe, count):
         return self.real.bars(timeframe, count)
 

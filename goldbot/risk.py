@@ -35,8 +35,14 @@ class SymbolSpec:
 
 
 def position_size(equity: float, risk_pct: float, sl_distance: float, spec: SymbolSpec,
-                  max_overshoot: float = 1.5) -> float:
-    """Lots tels que la perte au stop ≈ risk_pct du capital (jamais plus de max_overshoot × ce risque)."""
+                  max_risk_min_lot: float | None = None) -> float:
+    """Lots tels que la perte au stop ≈ risk_pct du capital.
+
+    Petit compte : si même le lot minimum dépasse risk_pct, on l'accepte seulement si sa perte
+    au stop reste ≤ max_risk_min_lot du capital (plafond absolu, 1,5 × risk_pct par défaut).
+    """
+    if max_risk_min_lot is None:
+        max_risk_min_lot = 1.5 * risk_pct
     if sl_distance <= 0 or equity <= 0:
         return 0.0
     budget = equity * risk_pct
@@ -44,9 +50,21 @@ def position_size(equity: float, risk_pct: float, sl_distance: float, spec: Symb
     raw = budget / per_lot
     lots = math.floor(raw / spec.volume_step + 1e-9) * spec.volume_step
     if lots < spec.volume_min:
-        # le lot minimum risquerait-il beaucoup plus que prévu ? alors on n'entre pas
-        lots = spec.volume_min if spec.volume_min * per_lot <= budget * max_overshoot else 0.0
+        # mode petit compte : le lot minimum est accepté tant qu'il reste sous le plafond absolu
+        lots = spec.volume_min if spec.volume_min * per_lot <= equity * max_risk_min_lot + 1e-9 else 0.0
     return round(min(lots, spec.volume_max), 2)
+
+
+def min_lot_risk_pct(equity: float, sl_distance: float, spec: SymbolSpec) -> float:
+    """Risque (en % du capital) d'un trade au lot minimum avec ce stop."""
+    return spec.volume_min * spec.loss_per_lot(sl_distance) / equity if equity > 0 else float("inf")
+
+
+def money(amount: float, currency: str = "USD") -> str:
+    """Montant lisible ; sur un compte cent (USC) on montre aussi l'équivalent en dollars."""
+    if currency.upper() in ("USC", "USX", "CENT", "US CENT"):
+        return f"{amount:,.0f} USC ({amount / 100:,.2f} $)".replace(",", " ")
+    return f"{amount:,.2f} {currency}".replace(",", " ")
 
 
 @dataclass

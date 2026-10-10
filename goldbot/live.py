@@ -23,7 +23,8 @@ import numpy as np
 from .broker.base import Broker, OrderResult, Position
 from .config import ROOT, Config
 from .notify import Notifier
-from .risk import RiskGuard, position_size
+from .indicators import atr
+from .risk import RiskGuard, min_lot_risk_pct, money, position_size
 from .strategies import STRATEGIES
 from .strategies.base import Strategy
 
@@ -142,12 +143,23 @@ class Engine:
     # ── actions ───────────────────────────────────────────
     def _enter(self, d: int, sl_dist: float, tp_dist: float, bid: float, ask: float, equity: float, bar: str) -> str:
         spec = self.broker.spec()
-        lots = position_size(equity, self.cfg.risk.risk_pct, sl_dist, spec)
+        cap = self._min_lot_cap()
+        lots = position_size(equity, self.cfg.risk.risk_pct, sl_dist, spec, cap)
         if lots <= 0:
-            msg = f"capital trop faible pour le lot minimum avec un stop de {sl_dist:.2f} $"
+            need = min_lot_risk_pct(equity, sl_dist, spec)
+            msg = (f"le lot minimum risquerait {100 * need:.1f} % du capital (plafond {100 * cap:.1f} %) "
+                   f"avec un stop de {sl_dist:.2f} $")
             log.warning("Entrée annulée : %s", msg)
             return "entrée annulée (" + msg + ")"
         price = ask if d > 0 else bid
+        # marge : on n'engage jamais plus qu'une fraction de la marge libre (vital sur un petit compte)
+        free = self.broker.free_margin() * self.cfg.risk.max_margin_use
+        while lots > spec.volume_min and self.broker.margin_required(d, lots, price) > free:
+            lots = round(lots - spec.volume_step, 2)
+        if self.broker.margin_required(d, lots, price) > free:
+            msg = "marge insuffisante pour le lot minimum"
+            log.warning("Entrée annulée : %s", msg)
+            return "entrée annulée (" + msg + ")"
         sl = round(price - d * sl_dist, spec.digits)
         tp = round(price + d * tp_dist, spec.digits) if np.isfinite(tp_dist) else None
         res = self.broker.open(d, lots, sl, tp, f"goldbot {self.strategy.name}")
@@ -156,9 +168,9 @@ class Engine:
             return "ordre refusé"
         self.memory.trades[str(res.ticket)] = {"sl_dist": sl_dist, "entry": res.price or price, "bar": bar, "lots": lots}
         self.memory.save(self.memory_path)
-        risk_usd = spec.loss_per_lot(sl_dist) * lots
+        risk_amt = spec.loss_per_lot(sl_dist) * lots
         self._alert(f"{'🟢 ACHAT' if d > 0 else '🔴 VENTE'} or {lots:.2f} lot à {res.price or price:.2f} | stop {sl:.2f} "
-                    f"| risque {risk_usd:.0f} $ ({100 * risk_usd / equity:.2f} %)")
+                    f"| risque {money(risk_amt, self.broker.currency())} ({100 * risk_amt / equity:.2f} %)")
         return f"entrée #{res.ticket}"
 
     def _close(self, p: Position, reason: str) -> OrderResult:
@@ -166,7 +178,7 @@ class Engine:
         if res.ok:
             self.memory.trades.pop(str(p.ticket), None)
             self.memory.save(self.memory_path)
-            self._alert(f"⚪ Clôture #{p.ticket} ({reason}) : {p.profit:+.2f} $")
+            self._alert(f"⚪ Clôture #{p.ticket} ({reason}) : {money(p.profit, self.broker.currency())}")
         else:
             self._alert(f"❌ Impossible de clôturer #{p.ticket} : {res.message}")
         return res
@@ -199,6 +211,35 @@ class Engine:
         improved = (new > p.sl + spec.point) if p.direction > 0 else (new < p.sl - spec.point)
         return new if improved else None
 
+    def _min_lot_cap(self) -> float:
+        return self.cfg.risk.max_risk_pct_min_lot or 1.5 * self.cfg.risk.risk_pct
+
+    def diagnose(self) -> tuple[bool, str]:
+        """Le compte peut-il appliquer la stratégie ? Calcule le risque réel au lot minimum avec le stop actuel."""
+        spec = self.broker.spec()
+        equity = self.broker.equity()
+        ccy = self.broker.currency()
+        bars = self.broker.bars(self.cfg.timeframe, 300)
+        sl_dist = float(atr(bars, 20).iloc[-1]) * float(self.strategy.params.get("sl_atr", 2.0))
+        need = min_lot_risk_pct(equity, sl_dist, spec)
+        cap = self._min_lot_cap()
+        lines = [f"Capital : {money(equity, ccy)} | symbole {spec.name} | lot minimum {spec.volume_min}",
+                 f"Stop actuel ({self.cfg.timeframe}) ≈ {sl_dist:.2f} $ → perte au lot minimum ≈ "
+                 f"{money(spec.volume_min * spec.loss_per_lot(sl_dist), ccy)} = {100 * need:.1f} % du capital"]
+        if need <= self.cfg.risk.risk_pct:
+            lines.append(f"✅ Compte adapté : risque visé {100 * self.cfg.risk.risk_pct:.1f} % par trade.")
+            return True, "\n".join(lines)
+        if need <= cap:
+            lines.append(f"🟡 Mode PETIT COMPTE : chaque trade risquera ≈ {100 * need:.1f} % (plafond {100 * cap:.1f} %). "
+                         "Le risque baissera tout seul quand le compte grandira.")
+            return True, "\n".join(lines)
+        cent = ccy.upper() in ("USC", "USX", "CENT")
+        hint = ("passe en unité de temps H1 (stops plus courts) ou augmente le capital" if cent else
+                "ouvre un COMPTE CENT HFM (le même ordre y coûte 100 fois moins) et/ou passe en H1")
+        lines.append(f"⛔ Compte trop petit : {100 * need:.1f} % de risque par trade au lot minimum dépasse le plafond "
+                     f"de {100 * cap:.1f} %. Solution : {hint}. Le bot ne prendra aucun trade dans ces conditions.")
+        return False, "\n".join(lines)
+
     def _alert(self, text: str) -> None:
         log.info(text)
         self.notify.send(text)
@@ -208,7 +249,12 @@ class Engine:
         self.broker.connect()
         spec = self.broker.spec()
         self._alert(f"🤖 GoldBot démarré ({self.cfg.mode}) sur {spec.name} | {self.strategy.describe()} | "
-                    f"risque {100 * self.cfg.risk.risk_pct:.2f} %/trade | capital {self.broker.equity():.2f}")
+                    f"risque {100 * self.cfg.risk.risk_pct:.2f} %/trade | capital {money(self.broker.equity(), self.broker.currency())}")
+        try:
+            ok, report = self.diagnose()
+            self._alert(report)
+        except Exception as e:  # noqa: BLE001
+            log.warning("Diagnostic impossible : %s", e)
         failures = 0
         while True:
             try:

@@ -23,6 +23,9 @@ class MT5Config:
 @dataclass
 class RiskConfig:
     risk_pct: float = 0.005
+    max_risk_pct_min_lot: float = 0.0   # petit compte : risque max accepté au lot minimum (0 = 1,5 × risk_pct)
+    leverage: float = 500.0             # pour l'estimation de marge en mode papier
+    max_margin_use: float = 0.5         # n'engage jamais plus de 50 % de la marge libre
     max_daily_loss: float = 0.03
     max_drawdown: float = 0.12
     max_spread: float = 0.80
@@ -64,4 +67,6 @@ def load(path: str | Path | None = None) -> Config:
         raise ValueError("mode doit valoir « paper » ou « live »")
     if not 0 < cfg.risk.risk_pct <= 0.03:
         raise ValueError("risk_pct doit être entre 0 et 3 % (0.03) : au-delà, la ruine devient probable")
+    if not 0 <= cfg.risk.max_risk_pct_min_lot <= 0.08:
+        raise ValueError("max_risk_pct_min_lot doit rester ≤ 8 % : au-delà, quelques pertes vident le compte")
     return cfg

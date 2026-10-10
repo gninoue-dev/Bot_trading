@@ -74,7 +74,31 @@ Le bot choisit ses réglages sur les 12 mois passés, trade les 3 mois suivants 
 
 À 2 % de risque, un passage à -35 % ou -40 % devient plausible : c'est psychologiquement insupportable pour la plupart des gens, et c'est là qu'on fait des erreurs. **Recommandation : 0,5 % au début, 1 % ensuite.**
 
-## 7. Limites honnêtes
+## 7. Version H1 pour les petits comptes
+Même stratégie, même filtre, unité de temps H1. Les stops sont 2 fois plus courts (~38 $), et le choix robuste des réglages donne les **mêmes paramètres qu'en H4** (20 / 10 / 200 / 2,0).
+
+| Walk-forward H1 hors échantillon (risque 1 %) | |
+|---|---|
+| Rendement annuel | +17,9 % |
+| Drawdown max | -8,5 % |
+| Profit factor | 1,62 |
+| Trades | 94 (5,6 par mois) |
+
+Simulation d'un **compte cent de 10 $** (hors échantillon, chaque trade au lot minimum) :
+
+| Plafond de risque au lot minimum | Capital final | Rendement annuel | Pire recul |
+|---|---|---|---|
+| 3 % | 14,96 $ | +34 % | -18 % |
+| **5 % (profil par défaut)** | **17,64 $** | **+50 %** | **-23 %** |
+| 7 % | 15,82 $ | +39 % | -22 % |
+
+Monte Carlo prudent (avantage divisé par deux, 150 trades) :
+- à **3 % de risque** par trade : recul médian -32 %, et -54 % dans le pire cas sur 20 ;
+- à **5 %** : recul médian -49 %.
+
+Le profil petit compte est fait pour **démarrer avec très peu**, pas pour placer une grosse somme : au-delà de quelques centaines de dollars, repasse en profil normal (H4, 1 %).
+
+## 8. Limites honnêtes
 - **2,4 ans de données intraday seulement**, pendant une période où l'or a beaucoup monté. Il faut **revalider sur l'historique de ton broker** (MT5 HFM donne bien plus d'années) : `goldbot fetch --source mt5`, puis `goldbot walkforward --csv …`.
 - Spread, swaps et glissement sont des **estimations** : vérifie-les dans MT5 (clic droit sur XAUUSD › Spécification).
 - Une stratégie de tendance a des **séries de pertes** : jusqu'à 8 pertes d'affilée observées, et des mois entiers sans trade. C'est normal, il ne faut pas l'arrêter à la première série.

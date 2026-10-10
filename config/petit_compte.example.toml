@@ -1,0 +1,48 @@
+# ════════════════════════════════════════════════════════════════════
+#  GoldBot — profil PETIT COMPTE (dès 10 $) sur COMPTE CENT HFM
+#  Copie ce fichier en config/config.toml pour l'utiliser.
+#
+#  Pourquoi un compte cent ? Sur un compte standard, le plus petit ordre d'or
+#  (0,01 lot) perd ~40 à 80 $ au stop : impossible avec 10 $. Sur un compte cent,
+#  le même ordre perd ~0,40 à 0,80 $ : avec 10 $ (= 1 000 USC), c'est jouable.
+#
+#  Simulation hors échantillon (mai 2025 → oct. 2026, données H1) :
+#  10 $ → 17,64 $, pire recul -23 %, 81 trades, tous au lot minimum.
+#  Les performances passées ne garantissent rien : commence en DÉMO cent.
+# ════════════════════════════════════════════════════════════════════
+
+mode = "paper"
+
+[mt5]
+terminal_path = ""
+login = 0
+password = ""
+server = ""
+symbol = ""            # détection automatique
+magic = 770077
+deviation_points = 30
+
+[strategy]
+name = "donchian_trend"
+timeframe = "H1"       # H1 : stops 2 fois plus courts qu'en H4 → possible avec un petit capital
+entry = 20
+exit = 10
+trend_ema = 200
+sl_atr = 2.0
+regime_filter = true
+
+[risk]
+risk_pct = 0.01               # risque visé : 1 % (atteint automatiquement quand le compte aura grandi)
+max_risk_pct_min_lot = 0.05   # petit compte : jusqu'à 5 % par trade au lot minimum, JAMAIS plus
+max_daily_loss = 0.10         # -10 % sur la journée → pause jusqu'au lendemain
+max_drawdown = 0.40           # -40 % depuis le plus haut → arrêt total (un petit compte bouge beaucoup)
+max_margin_use = 0.5          # n'engage jamais plus de la moitié de la marge libre
+max_spread = 0.80
+max_positions = 1
+news_blackout_minutes = 45
+news_dates = []
+no_entry_friday_after_utc = 18
+
+[notify]
+telegram_token = ""
+telegram_chat_id = ""

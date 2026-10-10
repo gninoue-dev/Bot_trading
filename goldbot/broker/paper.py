@@ -17,7 +17,9 @@ from .base import Broker, OrderResult, Position
 
 class PaperBroker(Broker):
     def __init__(self, data: pd.DataFrame, initial: float = 10_000.0, spread: float = 0.45,
-                 symbol: str = "XAUUSD", contract: float = 100.0):
+                 symbol: str = "XAUUSD", contract: float = 100.0, leverage: float = 500.0, currency: str = "USD"):
+        self.leverage = leverage
+        self.ccy = currency
         self.data = data
         self.symbol = symbol
         self.cash = initial
@@ -64,6 +66,16 @@ class PaperBroker(Broker):
 
     def balance(self) -> float:
         return self.cash
+
+    def currency(self) -> str:
+        return self.ccy
+
+    def margin_required(self, direction: int, volume: float, price: float) -> float:
+        return volume * self.contract * price / self.leverage
+
+    def free_margin(self) -> float:
+        used = sum(self.margin_required(p.direction, p.volume, p.price_open) for p in self._pos)
+        return self.equity() - used
 
     def equity(self) -> float:
         return self.cash + sum(p.profit for p in self.positions())

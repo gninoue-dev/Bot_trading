@@ -82,6 +82,17 @@ class MT5Broker(Broker):
     def balance(self) -> float:
         return float(self.mt5.account_info().balance)
 
+    def currency(self) -> str:
+        return str(self.mt5.account_info().currency or "USD")
+
+    def free_margin(self) -> float:
+        return float(self.mt5.account_info().margin_free)
+
+    def margin_required(self, direction: int, volume: float, price: float) -> float:
+        kind = self.mt5.ORDER_TYPE_BUY if direction > 0 else self.mt5.ORDER_TYPE_SELL
+        m = self.mt5.order_calc_margin(kind, self.symbol, float(volume), float(price))
+        return float(m) if m is not None else float("inf")
+
     def bid_ask(self) -> tuple[float, float]:
         t = self.mt5.symbol_info_tick(self.symbol)
         return float(t.bid), float(t.ask)

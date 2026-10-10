@@ -42,7 +42,7 @@ class RiskRules:
     max_daily_loss: float = 0.03  # -3 % sur la journée → plus d'entrée jusqu'au lendemain
     max_drawdown: float = 0.15    # -15 % depuis le plus haut → pause
     pause_days: int = 20          # durée de la pause après le drawdown max (le bot réel, lui, s'arrête net)
-    max_lot_risk_mult: float = 1.5  # si même le lot minimum risque > 1,5 × le risque voulu, on n'entre pas
+    max_risk_min_lot: float = 0.0   # petit compte : risque max au lot minimum (0 = 1,5 × risk_pct)
 
 
 @dataclass
@@ -162,7 +162,8 @@ def run(df: pd.DataFrame, strategy: Strategy, initial: float = 10_000.0, costs: 
             budget = equity * risk.risk_pct
             raw = budget / (sl_dist * costs.contract)
             size = np.floor(raw / costs.lot_step) * costs.lot_step
-            if size < costs.min_lot and costs.min_lot * sl_dist * costs.contract <= budget * risk.max_lot_risk_mult:
+            cap = risk.max_risk_min_lot or 1.5 * risk.risk_pct
+            if size < costs.min_lot and costs.min_lot * sl_dist * costs.contract <= equity * cap + 1e-9:
                 size = costs.min_lot
             size = min(size, costs.max_lot)
             if size >= costs.min_lot:
